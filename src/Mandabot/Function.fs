@@ -207,34 +207,29 @@ type Function() =
                     else if text.StartsWith "/start" then
                         do! Handlers.LetsGetStarted baseUrl msg from
                     else
-                        Client.SendMessage
-                            baseUrl
-                            {| chat_id = msg.chat.id
-                               text = "Hmm... weird I don't know what am I supposed to do with that" |}
-                        |> Async.AwaitTask
-                        |> Async.StartImmediateAsTask
-                        |> ignore
-
+                        let! _ =
+                            Client.SendMessage
+                                baseUrl
+                                {| chat_id = msg.chat.id
+                                   text = "Hmm... weird I don't know what am I supposed to do with that" |}
+                        ()
                 | None, Some text, Some from ->
                     // non command update, eg. added to a room, etc
                     printfn "%s - [%s - bot:%b]" text from.first_name from.is_bot
-                    Client.SendMessage
-                        baseUrl
-                        {| chat_id = msg.chat.id
-                           text = "I see, I'm not trained to answer that though..." |}
-                    |> Async.AwaitTask
-                    |> Async.StartImmediateAsTask
-                    |> ignore
+                    let! _ =
+                        Client.SendMessage
+                            baseUrl
+                            {| chat_id = msg.chat.id
+                               text = "I see, I'm not trained to answer that though..." |}
+                    ()
                 | unknown ->
                     printfn "Unknown Payload: %A" unknown
-                    Client.SendMessage
-                        baseUrl
-                        {| chat_id = msg.chat.id
-                           text = "Hey there! it's nice being here :)" |}
-                    |> Async.AwaitTask
-                    |> Async.StartImmediateAsTask
-                    |> ignore
-
+                    let! _ =
+                        Client.SendMessage
+                            baseUrl
+                            {| chat_id = msg.chat.id
+                               text = "Hey there! it's nice being here :)" |}
+                    ()
                 return {| method = "sendChatAction"
                           chat_id = msg.chat.id
                           action = SendChatActionType.Typing.ToActionString() |}
