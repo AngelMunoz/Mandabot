@@ -103,29 +103,69 @@ type Update =
       poll: Option<obj>
       poll_answer: Option<obj> }
 
+[<RequireQualifiedAccess>]
+type SendChatActionType =
+    | Typing
+    | UploadPhoto
+    | RecordVideo
+    | UploadVideo
+    | RecordAudio
+    | UploadAudio
+    | UploadDocument
+    | FindLocation
+    | RecordVideoNote
+    | UpdateVideoNote
+
+    member this.ToActionString() =
+        match this with
+        | Typing -> "typing"
+        | UploadPhoto -> "upload_photo"
+        | RecordVideo -> "record_video"
+        | UploadVideo -> "upload_video"
+        | RecordAudio -> "record_audio"
+        | UploadAudio -> "upload_audio"
+        | UploadDocument -> "upload_document"
+        | FindLocation -> "find_location"
+        | RecordVideoNote -> "record_video_note"
+        | UpdateVideoNote -> "update_video_note"
+
 type ApiResponse<'T> = { ok: bool; result: 'T }
 
-type SendMessagePayload =
-    { chat_id: int64
-      text: string
-      parse_mode: string }
-
+[<RequireQualifiedAccess>]
 module Client =
     open Mandabot.Lib
     open System.Threading.Tasks
     open FSharp.Control.Tasks
 
-    let sendMessage (baseurl: string)
-                    (payload: SendMessagePayload)
+    let SendMessage (baseurl: string)
+                    (payload: 'T)
                     : Task<Result<ApiResponse<Message>, {| ok: bool; error: string |}>> =
         task {
             let url = sprintf "%s/sendMessage" baseurl
-            let! response = Http.sendPost<SendMessagePayload, ApiResponse<Message>> payload url
+            let! response = Http.sendPost<'T, ApiResponse<Message>> payload url
 
             match response with
             | Ok result -> return Ok result
             | Error err ->
                 return Error
+                           {| ok = false
+                              error = err.description |}
+        }
+
+    let SendChatAction (baseUrl: string) (chatid: int64) (action: SendChatActionType) =
+        task {
+            let url = sprintf "%s/sendChatAction" baseUrl
+
+            let payload =
+                {| chat_id = chatid
+                   action = action.ToActionString() |}
+
+            let! response = Http.sendPost<{| chat_id: int64; action: string |}, ApiResponse<bool>> payload url
+
+            return match response with
+                   | Ok result -> Ok result
+                   | Error err ->
+                       Error
                            {| ok = false
                               error = err.description |}
         }
