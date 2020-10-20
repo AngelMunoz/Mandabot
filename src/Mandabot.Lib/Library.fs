@@ -14,9 +14,3 @@ type CustomSerializer() as this =
         this.SerializerOptions.IgnoreNullValues <- true
         this.SerializerOptions.Converters.Add(JsonFSharpConverter())
         this.SerializerOptions.ReadCommentHandling <- JsonCommentHandling.Skip
-
-
-type GetNotesLambdaParams = { userid: int64 }
-
-type GetNotesLambdaResponse =
-    { notes: array<{| id: int64; text: string |}> }

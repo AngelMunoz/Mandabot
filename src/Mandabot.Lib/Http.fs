@@ -9,7 +9,7 @@ open System.Text
 
 [<RequireQualifiedAccess>]
 module Http =
-    let JsonSerializerOpts =
+    let private jsonSerializerOpts =
         let opts = JsonSerializerOptions()
         opts.AllowTrailingCommas <- true
         opts.IgnoreNullValues <- true
@@ -33,10 +33,10 @@ module Http =
             let! json = response.Content.ReadAsStringAsync()
 
             if response.IsSuccessStatusCode then
-                return Ok(JsonSerializer.Deserialize<'U>(json, JsonSerializerOpts.Value))
+                return Ok(JsonSerializer.Deserialize<'U>(json, jsonSerializerOpts.Value))
             else
                 return Error
                            (JsonSerializer.Deserialize<{| ok: bool
                                                           error_code: int
-                                                          description: string |}>(json, JsonSerializerOpts.Value))
+                                                          description: string |}>(json, jsonSerializerOpts.Value))
         }
