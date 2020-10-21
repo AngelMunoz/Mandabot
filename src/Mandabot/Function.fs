@@ -48,6 +48,15 @@ module Commands =
             return sprintf "Saved Note:\n<b>%s</b>\n%s" title content
         }
 
+    let DeleteNote (chatid: int64) (userid: int64) (query: Option<string>): Task<string> =
+        task {
+            // TODO: query against an actual database
+            let note =
+                defaultArg query "We couldn't find your note..."
+
+            return (sprintf "Deleted: [%s]" note)
+        }
+
 
 
 
@@ -109,7 +118,7 @@ module Handlers =
                    | _ -> ()
         }
 
-    let AddNote (baseUrl: string) (chat: int64) (from: int64) (note: string * string) =
+    let SaveNote (baseUrl: string) (chat: int64) (from: int64) (note: string * string) =
         task {
             Client.SendChatAction baseUrl chat SendChatActionType.Typing
             |> Async.AwaitTask
@@ -128,6 +137,26 @@ module Handlers =
                    | Error err -> eprintfn "Failed to send Message - [%i;%i - %s]" chat from err.error
                    | _ -> ()
         }
+
+    let DeleteNote (baseUrl: string) (chat: int64) (from: int64) (query: Option<string>) =
+        task {
+            Client.SendChatAction baseUrl chat SendChatActionType.Typing
+            |> Async.AwaitTask
+            |> Async.StartImmediateAsTask
+            |> ignore
+            let! result = Commands.DeleteNote chat from query
+
+            let! result =
+                Client.SendMessage
+                    baseUrl
+                    {| chat_id = chat
+                       text = result |}
+
+            return match result with
+                   | Error err -> eprintfn "Failed to send Message - [%i;%i - %s]" chat from err.error
+                   | _ -> ()
+        }
+
 
 
 type Function() =
@@ -169,15 +198,21 @@ type Function() =
 
                     if text.StartsWith "/getnote" then
                         let text =
-                            if text.Length > 8 then Some(text.Substring(8).Trim()) else None
+                            if text.StartsWith("/getnote@mandadinbot")
+                            then if text.Length > 20 then Some(text.Substring(20).Trim()) else None
+                            else if text.Length > 8
+                            then Some(text.Substring(8).Trim())
+                            else None
 
                         do! Handlers.GetNote baseUrl msg.chat.id from.id text
-                    else
-
-                    if text.StartsWith "/addnote" then
+                    else if text.StartsWith "/savenote" then
                         let (title, content) =
                             let lines =
-                                if text.Length > 8 then text.Substring(8).Trim() else ""
+                                if text.StartsWith("/savenote@mandadinbot")
+                                then if text.Length > 21 then text.Substring(21).Trim() else ""
+                                else if text.Length > 9
+                                then text.Substring(9).Trim()
+                                else ""
 
                             let split = lines.Split('\n')
                             if split.Length > 1 then
@@ -199,11 +234,15 @@ type Function() =
 
                             ()
                         else
-                            do! Handlers.AddNote baseUrl msg.chat.id from.id (title.Value, content)
-                    else if text.StartsWith "/updatenote" then
-                        ()
+                            do! Handlers.SaveNote baseUrl msg.chat.id from.id (title.Value, content)
                     else if text.StartsWith "/deletenote" then
-                        ()
+                        let text =
+                            if text.StartsWith("/deletenote@mandadinbot")
+                            then if text.Length > 23 then Some(text.Substring(23).Trim()) else None
+                            else if text.Length > 11
+                            then Some(text.Substring(11).Trim())
+                            else None
+                        do! Handlers.DeleteNote baseUrl msg.chat.id from.id text
                     else if text.StartsWith "/start" then
                         do! Handlers.LetsGetStarted baseUrl msg from
                     else
@@ -212,6 +251,7 @@ type Function() =
                                 baseUrl
                                 {| chat_id = msg.chat.id
                                    text = "Hmm... weird I don't know what am I supposed to do with that" |}
+
                         ()
                 | None, Some text, Some from ->
                     // non command update, eg. added to a room, etc
@@ -221,6 +261,7 @@ type Function() =
                             baseUrl
                             {| chat_id = msg.chat.id
                                text = "I see, I'm not trained to answer that though..." |}
+
                     ()
                 | unknown ->
                     printfn "Unknown Payload: %A" unknown
@@ -229,7 +270,9 @@ type Function() =
                             baseUrl
                             {| chat_id = msg.chat.id
                                text = "Hey there! it's nice being here :)" |}
+
                     ()
+
                 return {| method = "sendChatAction"
                           chat_id = msg.chat.id
                           action = SendChatActionType.Typing.ToActionString() |}
